@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Illuminate\Contracts\View\View;
 use Filament\Actions\BulkActionGroup;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,43 +31,101 @@ class ListItems extends Component implements HasActions, HasSchemas, HasTable
         return $table
             ->query(fn (): Builder => Item::query())
             ->columns([
+                // New Image Column
+                ImageColumn::make('image')
+                    ->label('Image')
+                    ->disk('public')
+                    ->size(60)
+                    ->circular()
+                    ->defaultImageUrl(url('/images/placeholder.png'))
+                    ->extraAttributes(['class' => 'p-2']),
+                    
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('sku')
                     ->searchable()
                     ->sortable(),
+                    
                 TextColumn::make('price')
                     ->sortable()
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.')),
+                    ->formatStateUsing(fn ($state) => 'PHP ' . number_format($state, 2, '.', ','))
+                    ->searchable(),
+                    
                 TextColumn::make('status')
-                    ->badge(),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'inactive' => 'danger',
+                    })
+                    ->sortable(),
+                    
+                TextColumn::make('created_at')
+                    ->label('Created')
+                    ->dateTime('M d, Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                    
+                TextColumn::make('updated_at')
+                    ->label('Updated')
+                    ->dateTime('M d, Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                // Add filters if needed
             ])
             ->headerActions([
                 Action::make('create')
-                    ->label('Add New')
+                    ->label('Add New Item')
+                    ->icon('heroicon-o-plus')
                     ->url(fn (): string => route('items.create'))
+                    ->color('success')
             ])
             ->recordActions([
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon('heroicon-o-pencil')
+                    ->url(fn (Item $record): string => route('items.update', $record))
+                    ->color('warning'),
+                    
                 Action::make('delete')
+                    ->label('Delete')
+                    ->icon('heroicon-o-trash')
                     ->requiresConfirmation()
                     ->color('danger')
-                    ->action(fn (Item $record) => $record->delete())
+                    ->action(function (Item $record) {
+                        // Delete image file if exists
+                        if ($record->image) {
+                            \Illuminate\Support\Facades\Storage::disk('public')->delete('item_images/' . $record->image);
+                        }
+                        $record->delete();
+                    })
                     ->successNotification(
                         Notification::make()
-                            ->title('Deleted successfully')
+                            ->title('Item deleted successfully')
                             ->success()
                     ),
-
-                Action::make('edit')
-                    ->url(fn (Item $record): string => route('items.update', $record))
-                    // ->openUrlInNewTab()
             ])
-            ->toolbarActions([
+            ->bulkActions([
                 BulkActionGroup::make([
-                    //
+                    Action::make('delete')
+                        ->label('Delete Selected')
+                        ->icon('heroicon-o-trash')
+                        ->requiresConfirmation()
+                        ->color('danger')
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                // Delete image file if exists
+                                if ($record->image) {
+                                    \Illuminate\Support\Facades\Storage::disk('public')->delete('item_images/' . $record->image);
+                                }
+                                $record->delete();
+                            }
+                        })
+                        ->successNotification(
+                            Notification::make()
+                                ->title('Selected items deleted successfully')
+                                ->success()
+                        ),
                 ]),
             ]);
     }

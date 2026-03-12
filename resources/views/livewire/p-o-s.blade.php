@@ -3,7 +3,7 @@
         <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">Products</h2>
 
         <div class="flex-shrink-0 mb-4">
-            <input wire:model.live="search" type="text" placeholder="Search products by name or SKU..." class="w-full px-5 py-3 border border-blue-300 rounded-xl shadow-sm
+            <input wire:model.live="search" type="text" placeholder="Search products by name" class="w-full px-5 py-3 border border-blue-300 rounded-xl shadow-sm
                         focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors
                         dark:bg-neutral-800 dark:border-blue-700 dark:text-gray-100">
 
@@ -31,9 +31,9 @@
                                 <span class="text-sm">Item Image</span>
                             </div> --}}
                             <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ $item->name }}</h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">SKU: {{ $item->sku }}</p>
                             <p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-bold">
-                                Rp {{ number_format($item->price, 0, ',', '.') }}
+                                <!-- Display price with 2 decimal places -->
+                                PHP {{ number_format($item->price, 2, '.', ',') }}
                             </p>
                         </div>
                         <button wire:click="addToCart({{ $item->id }})" class="w-full py-3 bg-indigo-600 text-white font-bold transition-colors duration-200
@@ -47,7 +47,7 @@
             </div>
         </div>
     </div>
- {{-- Right panel --}}
+    {{-- Right panel --}}
     <div
         class="w-1/3 bg-white dark:bg-neutral-800 border-l dark:border-neutral-700 p-6 flex flex-col shadow-xl overflow-y-auto">
         <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">Checkout</h2>
@@ -56,8 +56,8 @@
                 <div class="flex items-center justify-between p-4 mb-4 bg-gray-50 dark:bg-neutral-700 rounded-xl shadow-sm">
                     <div class="flex-1">
                         <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ $cartItem['name'] }}</h4>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">SKU: {{ $cartItem['sku'] }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Rp {{ number_format($cartItem['price'], 0, ',', '.') }} each</p>
+                        <!-- Display price with 2 decimal places -->
+                        <p class="text-xs text-gray-500 dark:text-gray-400">PHP {{ number_format($cartItem['price'], 2, '.', ',') }} each</p>
                     </div>
 
                     <div class="flex items-center space-x-2">
@@ -79,7 +79,7 @@
             @endforelse
         </div>
 
-        {{-- checkout stert --}}
+        {{-- checkout start --}}
         <div class="flex-shrink-0 mt-6 space-y-4">
             <div class="space-y-2">
                 <div>
@@ -109,85 +109,15 @@
                         @endforeach
                     </select>
                 </div>
-            </div>
 
-            <div class="mt-4">
-                <label for="discount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Discount
-                    Amount</label>
-                <input type="text" id="discount" min="0"
-                    placeholder="Enter discount amount" class="py-2.5 sm:py-3 px-4 block w-full border-gray-200 rounded-lg sm:text-sm
-                        focus:border-blue-500 focus:ring-blue-500
-                        dark:bg-neutral-900 dark:border-neutral-700
-                        dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600"
-                    x-data="{
-                        formatNum(val) {
-                            let str = val.toString();
-                            return str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                        },
-                        init() {
-                            this.$watch('$wire.discount_amount', value => {
-                                if (value && typeof value === 'number' && value > 0) {
-                                    this.$el.value = this.formatNum(value);
-                                } else {
-                                    this.$el.value = '';
-                                    $wire.$set('discount_amount', 0);
-                                }
-                            });
-                            if (this.$wire.discount_amount && this.$wire.discount_amount > 0) {
-                                this.$el.value = this.formatNum(this.$wire.discount_amount);
-                            } else {
-                                this.$el.value = '';
-                                $wire.$set('discount_amount', 0);
-                            }
-                        }
-                    }"
-                    x-on:input="let clean = $event.target.value.replace(/[^\d]/g, ''); if(clean && parseInt(clean) > 0) { let formatted = formatNum(parseInt(clean)); $event.target.value = formatted; $wire.$set('discount_amount', parseInt(clean)); } else { $event.target.value = ''; $wire.$set('discount_amount', 0); }"
-                    x-on:blur="let clean = $event.target.value.replace(/[^\d]/g, ''); if(clean && parseInt(clean) > 0) { $wire.$set('discount_amount', parseInt(clean)); } else { $event.target.value = ''; $wire.$set('discount_amount', 0); }"
-                    x-on:keypress="if(!/[0-9]/.test($event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes($event.key)) $event.preventDefault();">
-            </div>
-
-            <div class="mt-6 pt-6 border-t border-gray-200 dark:border-neutral-700">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Subtotal:</span>
-                    <span class="font-medium text-gray-800 dark:text-gray-100">Rp
-                        {{ number_format($this->subtotal, 0, ',', '.') }}</span>
-                </div>
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Tax (15%):</span>
-                    <span class="font-medium text-gray-800 dark:text-gray-100">Rp
-                        {{ number_format($this->tax, 0, ',', '.') }}</span>
-                </div>
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm text-gray-600 dark:text-gray-400">Total before discount:</span>
-                    <span class="font-medium text-gray-800 dark:text-gray-100">Rp
-                        {{ number_format($this->totalBeforeDiscount, 0, ',', '.') }}</span>
-                </div>
-                <div class="flex justify-between items-center mb-2 text-red-500 dark:text-red-400">
-                    <span class="text-sm font-semibold">Discount:</span>
-                    <span class="font-semibold">- Rp {{ number_format($this->discount_amount, 0, ',', '.') }}</span>
-                </div>
-                <div
-                    class="flex justify-between items-center text-xl font-bold mt-2 border-t border-gray-200 dark:border-neutral-700 pt-2">
-                    <span>Final Total:</span>
-                    <span>Rp {{ number_format($this->total, 0, ',', '.') }}</span>
-                </div>
-                <div
-                    class="flex justify-between items-center text-lg font-bold mt-2 border-t border-gray-200 dark:border-neutral-700 pt-2">
-                    <span>Change Given:</span>
-                    <span>Rp {{ number_format($this->change, 0, ',', '.') }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex-shrink-0 mt-6">
-            <input type="text" min="0" placeholder="Amount Paid" class="py-2.5 sm:py-3 px-4 block w-full border-gray-200 rounded-lg sm:text-sm
+                <input type="text" min="0" placeholder="Amount Paid" class="py-2.5 sm:py-3 px-4 block w-full border-gray-200 rounded-lg sm:text-sm
                        focus:border-blue-500 focus:ring-blue-500 mb-4
                        dark:bg-neutral-900 dark:border-neutral-700
                        dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600"
                 x-data="{
                     formatNum(val) {
                         let str = val.toString();
-                        return str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
                     },
                     init() {
                         this.$watch('$wire.paid_amount', value => {
@@ -203,6 +133,35 @@
                 x-on:input="let clean = $event.target.value.replace(/[^\d]/g, ''); if(clean) { let formatted = formatNum(parseInt(clean)); $event.target.value = formatted; $wire.$set('paid_amount', parseInt(clean)); } else { $event.target.value = ''; $wire.$set('paid_amount', 0); }"
                 x-on:blur="let clean = $event.target.value.replace(/[^\d]/g, ''); $wire.$set('paid_amount', clean ? parseInt(clean) : 0);"
                 x-on:keypress="if(!/[0-9]/.test($event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes($event.key)) $event.preventDefault();">
+            </div>
+
+            <!-- REMOVED: Discount input section -->
+
+            <div class="mt-6 pt-6 border-t border-gray-200 dark:border-neutral-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Payment:</span>
+                    <span class="font-medium text-gray-800 dark:text-gray-100">PHP
+                        <!-- Display subtotal with 2 decimal places -->
+                        {{ number_format($this->paid_amount, 2, '.', ',') }}</span>
+                </div>
+                <div
+                    class="flex justify-between items-center text-xl font-bold mt-2 border-t border-gray-200 dark:border-neutral-700 pt-2">
+                    <span>Total:</span>
+                    <span>PHP
+                        <!-- Display total with 2 decimal places -->
+                        {{ number_format($this->subtotal, 2, '.', ',') }}</span>
+                </div>
+                <div
+                    class="flex justify-between items-center text-lg font-bold mt-2 border-t border-gray-200 dark:border-neutral-700 pt-2">
+                    <span>Change Given:</span>
+                    <span>PHP
+                        <!-- Display change with 2 decimal places -->
+                        {{ number_format($this->change, 2, '.', ',') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-shrink-0 mt-6">
 
             <button wire:click="checkout" wire:loading.attr="disabled" class="w-full py-4 bg-green-600 text-white font-bold text-lg rounded-xl
                        transition-colors duration-200 hover:bg-green-700 disabled:opacity-50

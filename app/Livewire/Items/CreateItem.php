@@ -4,11 +4,12 @@ namespace App\Livewire\Items;
 
 use App\Models\Item;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Filament\Support\RawJs;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Filament\Forms\Components\Select;
-
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
@@ -17,11 +18,13 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
+use Illuminate\Support\Facades\Storage;
 
 class CreateItem extends Component implements HasActions, HasSchemas
 {
     use InteractsWithActions;
     use InteractsWithSchemas;
+    use WithFileUploads;
 
     public ?array $data = [];
 
@@ -41,29 +44,72 @@ class CreateItem extends Component implements HasActions, HasSchemas
                         TextInput::make('name')
                             ->label('Item Name')
                             ->required(),
-                        TextInput::make('sku')
-                            ->required()
-                            ->unique(),
                         TextInput::make('price')
-                            ->prefix('Rp')
+                            ->prefix('PHP')
                             ->live(onBlur: false)
-                            ->formatStateUsing(fn ($state) => $state ? number_format($state, 0, ',', '.') : '')
+                            ->formatStateUsing(fn ($state) => $state ? number_format($state / 100, 2, '.', ',') : '')
                             ->afterStateUpdated(function ($state, $set) {
                                 if ($state && is_string($state)) {
                                     $cleanValue = preg_replace('/[^\d]/', '', $state);
                                     if ($cleanValue && $cleanValue !== $state) {
-                                        $formatted = number_format((int) $cleanValue, 0, ',', '.');
-                                        $set('price', $formatted);
+                                        // Store as integer (multiplied by 100)
+                                        $set('price', (int) $cleanValue);
                                     }
                                 }
                             })
                             ->extraAttributes([
-                                'x-data' => "{ formatNum(val) { let str = val.toString(); return str.replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.'); } }",
-                                'x-on:input' => "let clean = \$event.target.value.replace(/[^\\d]/g, ''); if(clean) { let formatted = formatNum(parseInt(clean)); \$event.target.value = formatted; \$wire.\$set('data.price', formatted); } else { \$event.target.value = ''; \$wire.\$set('data.price', ''); }",
+                                'x-data' => "{ 
+                                    formatNum(val) { 
+                                        let str = val.toString();
+                                        // Format with thousand separators and two decimal places
+                                        let num = parseInt(str.replace(/[^\\d]/g, '')) / 100;
+                                        return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    } 
+                                }",
+                                'x-on:input' => "let clean = \$event.target.value.replace(/[^\\d]/g, ''); 
+                                                  if(clean) { 
+                                                      let num = parseInt(clean);
+                                                      let formatted = (num / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                      \$event.target.value = formatted; 
+                                                      \$wire.\$set('data.price', num);
+                                                  } else { 
+                                                      \$event.target.value = ''; 
+                                                      \$wire.\$set('data.price', ''); 
+                                                  }",
                                 'x-on:keypress' => "if(!/[0-9]/.test(\$event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(\$event.key)) \$event.preventDefault();",
                             ])
-                            ->dehydrateStateUsing(fn ($state) => (int) str_replace('.', '', $state ?? ''))
+                            ->dehydrateStateUsing(fn ($state) => (int) $state)
                             ->rules(['required', 'integer', 'min:0']),
+                        // Fixed Image Upload Field
+                        FileUpload::make('image')
+                            ->label('Item Image')
+                            ->image()
+                            ->imageEditor()
+                            ->directory('item_images')
+                            ->visibility('public')
+                            ->maxSize(5120)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'])
+                            ->imagePreviewHeight('150')
+                            ->loadingIndicatorPosition('left')
+                            ->panelLayout('integrated')
+                            ->removeUploadedFileButtonPosition('right')
+                            ->uploadButtonPosition('left')
+                            ->uploadProgressIndicatorPosition('left')
+                            ->downloadable()
+                            ->openable()
+                            ->columnSpanFull()
+                            ->helperText('Upload an image for the item (Max: 5MB, Formats: JPG, PNG, GIF, WEBP)')
+                            ->preserveFilenames()
+                            ->storeFileNamesIn('image_filename') // This helps store the filename
+                            ->getUploadedFileNameForStorageUsing(function ($file) {
+                                // Generate a unique filename with timestamp
+                                $originalName = $file->getClientOriginalName();
+                                $extension = $file->getClientOriginalExtension();
+                                $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+                                $timestamp = time();
+                                $filename = "{$baseName}_{$timestamp}.{$extension}";
+                                return $filename;
+                            }),
                         ToggleButtons::make('status')
                             ->label('Is this Item Active?')
                             ->options([
@@ -80,17 +126,54 @@ class CreateItem extends Component implements HasActions, HasSchemas
 
     public function create(): void
     {
+        // Get the form data
         $data = $this->form->getState();
+        
+        // Handle image upload properly
+        if (isset($data['image']) && !empty($data['image'])) {
+            // Check if it's a Livewire temporary file
+            if (is_object($data['image']) && method_exists($data['image'], 'getFilename')) {
+                // Get the temporary file path
+                $tempFile = $data['image'];
+                
+                // Generate a unique filename
+                $originalName = $tempFile->getClientOriginalName();
+                $extension = $tempFile->getClientOriginalExtension();
+                $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+                $timestamp = time();
+                $filename = "{$baseName}_{$timestamp}.{$extension}";
+                
+                // Store the file manually to ensure it's saved
+                $path = $tempFile->storeAs('item_images', $filename, 'public');
+                
+                if ($path) {
+                    // Store only the filename in the database
+                    $data['image'] = $filename;
+                } else {
+                    // If storage fails, set to null
+                    $data['image'] = null;
+                }
+            } elseif (is_string($data['image'])) {
+                // If it's already a string, keep it as is
+                // This might be the case if the file was already processed
+                $data['image'] = basename($data['image']);
+            }
+        } else {
+            // No image uploaded
+            $data['image'] = null;
+        }
 
+        // Create the record with all data
         $record = Item::create($data);
-
-        $this->form->model($record)->saveRelationships();
 
         Notification::make()
             ->title('Item Created!')
             ->success()
             ->body("Item created successfully!")
             ->send();
+        
+        // Redirect to the manage items page
+        $this->redirect('/manage-items');
     }
 
     public function render(): View
