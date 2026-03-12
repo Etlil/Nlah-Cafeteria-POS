@@ -79,7 +79,7 @@ class POS extends Component
     #[Computed]
     public function tax()
     {
-        return $this->subtotal * 0.15; // 15%
+        return $this->subtotal * 0; // 15%
     }
 
     #[Computed]

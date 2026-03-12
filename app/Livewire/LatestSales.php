@@ -92,12 +92,12 @@ class LatestSales extends TableWidget
                     ->expandableLimitedList(),
                 TextColumn::make('total')
                     ->sortable()
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.')),
+                    ->formatStateUsing(fn ($state) => 'PHP ' . number_format($state, 0, ',', '.')),
                 TextColumn::make('discount')
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.')),
+                    ->formatStateUsing(fn ($state) => 'PHP ' . number_format($state, 0, ',', '.')),
                 TextColumn::make('paid_amount')
                     ->sortable()
-                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format($state, 0, ',', '.')),
+                    ->formatStateUsing(fn ($state) => 'PHP ' . number_format($state, 0, ',', '.')),
                 TextColumn::make('paymentMethod.name'),
                 TextColumn::make('created_at')
                     ->label('Transaction Time')
