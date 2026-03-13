@@ -26,18 +26,37 @@ class ListItems extends Component implements HasActions, HasSchemas, HasTable
     use InteractsWithTable;
     use InteractsWithSchemas;
 
+    public $category = 'all';
+
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => Item::query())
+            ->query(fn (): Builder => Item::query()
+                ->when($this->category !== 'all', function (Builder $query) {
+                    $query->where('type', $this->category);
+                }))
+            ->searchable()
             ->columns([
                 // New Image Column
                 ImageColumn::make('image')
                     ->label('Image')
                     ->disk('public')
+                    ->getStateUsing(function (?Item $record): ?string {
+                        if (!$record || !$record->image) {
+                            return null;
+                        }
+
+                        // Normalize to a storage-relative path for the public disk.
+                        $path = str_starts_with($record->image, 'item_images/')
+                            ? $record->image
+                            : 'item_images/' . ltrim($record->image, '/');
+
+                        // Build an absolute URL using the current request host/port.
+                        return rtrim(request()->getSchemeAndHttpHost(), '/') . '/storage/' . $path;
+                    })
                     ->size(60)
                     ->circular()
-                    ->defaultImageUrl(url('/images/placeholder.png'))
+                    ->defaultImageUrl(rtrim(request()->getSchemeAndHttpHost(), '/') . '/images/placeholder.png')
                     ->extraAttributes(['class' => 'p-2']),
                     
                 TextColumn::make('name')
@@ -95,7 +114,10 @@ class ListItems extends Component implements HasActions, HasSchemas, HasTable
                     ->action(function (Item $record) {
                         // Delete image file if exists
                         if ($record->image) {
-                            \Illuminate\Support\Facades\Storage::disk('public')->delete('item_images/' . $record->image);
+                            $path = str_starts_with($record->image, 'item_images/')
+                                ? $record->image
+                                : 'item_images/' . ltrim($record->image, '/');
+                            \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
                         }
                         $record->delete();
                     })
@@ -116,7 +138,10 @@ class ListItems extends Component implements HasActions, HasSchemas, HasTable
                             foreach ($records as $record) {
                                 // Delete image file if exists
                                 if ($record->image) {
-                                    \Illuminate\Support\Facades\Storage::disk('public')->delete('item_images/' . $record->image);
+                                    $path = str_starts_with($record->image, 'item_images/')
+                                        ? $record->image
+                                        : 'item_images/' . ltrim($record->image, '/');
+                                    \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
                                 }
                                 $record->delete();
                             }

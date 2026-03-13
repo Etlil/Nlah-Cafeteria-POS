@@ -18,7 +18,6 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
-use Illuminate\Support\Facades\Storage;
 
 class CreateItem extends Component implements HasActions, HasSchemas
 {
@@ -44,6 +43,16 @@ class CreateItem extends Component implements HasActions, HasSchemas
                         TextInput::make('name')
                             ->label('Item Name')
                             ->required(),
+                        Select::make('type')
+                            ->label('Category')
+                            ->options([
+                                'meals' => 'Meals',
+                                'drinks' => 'Drinks',
+                                'snacks' => 'Snacks',
+                            ])
+                            ->default('meals')
+                            ->required()
+                            ->native(false),
                         TextInput::make('price')
                             ->prefix('PHP')
                             ->live(onBlur: false)
@@ -85,6 +94,7 @@ class CreateItem extends Component implements HasActions, HasSchemas
                             ->label('Item Image')
                             ->image()
                             ->imageEditor()
+                            ->disk('public')
                             ->directory('item_images')
                             ->visibility('public')
                             ->maxSize(5120)
@@ -100,7 +110,6 @@ class CreateItem extends Component implements HasActions, HasSchemas
                             ->columnSpanFull()
                             ->helperText('Upload an image for the item (Max: 5MB, Formats: JPG, PNG, GIF, WEBP)')
                             ->preserveFilenames()
-                            ->storeFileNamesIn('image_filename') // This helps store the filename
                             ->getUploadedFileNameForStorageUsing(function ($file) {
                                 // Generate a unique filename with timestamp
                                 $originalName = $file->getClientOriginalName();
@@ -131,35 +140,22 @@ class CreateItem extends Component implements HasActions, HasSchemas
         
         // Handle image upload properly
         if (isset($data['image']) && !empty($data['image'])) {
-            // Check if it's a Livewire temporary file
-            if (is_object($data['image']) && method_exists($data['image'], 'getFilename')) {
-                // Get the temporary file path
+            if (is_object($data['image']) && method_exists($data['image'], 'getClientOriginalName')) {
                 $tempFile = $data['image'];
-                
-                // Generate a unique filename
+
                 $originalName = $tempFile->getClientOriginalName();
                 $extension = $tempFile->getClientOriginalExtension();
                 $baseName = pathinfo($originalName, PATHINFO_FILENAME);
                 $timestamp = time();
                 $filename = "{$baseName}_{$timestamp}.{$extension}";
-                
-                // Store the file manually to ensure it's saved
+
                 $path = $tempFile->storeAs('item_images', $filename, 'public');
-                
-                if ($path) {
-                    // Store only the filename in the database
-                    $data['image'] = $filename;
-                } else {
-                    // If storage fails, set to null
-                    $data['image'] = null;
-                }
+                $data['image'] = $path ?: null;
             } elseif (is_string($data['image'])) {
-                // If it's already a string, keep it as is
-                // This might be the case if the file was already processed
-                $data['image'] = basename($data['image']);
+                // Filament already stored the file; keep the relative path.
+                $data['image'] = ltrim($data['image'], '/');
             }
         } else {
-            // No image uploaded
             $data['image'] = null;
         }
 

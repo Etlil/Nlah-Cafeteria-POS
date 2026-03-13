@@ -6,6 +6,19 @@
             <input wire:model.live="search" type="text" placeholder="Search products by name" class="w-full px-5 py-3 border border-blue-300 rounded-xl shadow-sm
                         focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors
                         dark:bg-neutral-800 dark:border-blue-700 dark:text-gray-100">
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach (['all' => 'All', 'meals' => 'Meals', 'drinks' => 'Drinks', 'snacks' => 'Snacks'] as $key => $label)
+                    <button type="button"
+                        wire:click="$set('category', '{{ $key }}')"
+                        class="px-4 py-2 rounded-full text-sm font-semibold border transition-colors
+                               {{ $category === $key
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-800 border-blue-300 hover:bg-blue-50' }}
+                               dark:border-blue-700 dark:bg-neutral-900 dark:text-gray-100 dark:hover:bg-neutral-800">
+                        {{ $label }}
+                    </button>
+                @endforeach
+            </div>
 
             @if(session()->has('error'))
                 <div class="mt-2 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg shadow-md">
@@ -26,10 +39,19 @@
                     <div class="bg-white dark:bg-neutral-800 rounded-2xl shadow-lg overflow-hidden
                                          transition-all duration-200 transform hover:scale-105 hover:shadow-xl">
                         <div class="p-4">
-                            {{-- <div
-                                class="w-full h-32 bg-gray-200 dark:bg-neutral-700 rounded-lg mb-3 flex items-center justify-center text-gray-400">
-                                <span class="text-sm">Item Image</span>
-                            </div> --}}
+                            @php
+                                $imagePath = $item->image
+                                    ? (str_starts_with($item->image, 'item_images/') ? $item->image : 'item_images/' . ltrim($item->image, '/'))
+                                    : null;
+                                $imageUrl = $imagePath
+                                    ? rtrim(request()->getSchemeAndHttpHost(), '/') . '/storage/' . $imagePath
+                                    : rtrim(request()->getSchemeAndHttpHost(), '/') . '/images/placeholder.png';
+                            @endphp
+                            <img
+                                src="{{ $imageUrl }}"
+                                alt="{{ $item->name }}"
+                                class="w-full h-32 object-cover rounded-lg mb-3 bg-gray-200 dark:bg-neutral-700"
+                            />
                             <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ $item->name }}</h3>
                             <p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-bold">
                                 <!-- Display price with 2 decimal places -->
@@ -110,29 +132,34 @@
                     </select>
                 </div>
 
-                <input type="text" min="0" placeholder="Amount Paid" class="py-2.5 sm:py-3 px-4 block w-full border-gray-200 rounded-lg sm:text-sm
-                       focus:border-blue-500 focus:ring-blue-500 mb-4
-                       dark:bg-neutral-900 dark:border-neutral-700
-                       dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600"
-                x-data="{
-                    formatNum(val) {
-                        let str = val.toString();
-                        return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                    },
-                    init() {
-                        this.$watch('$wire.paid_amount', value => {
-                            if (value && typeof value === 'number') {
-                                this.$el.value = this.formatNum(value);
-                            }
-                        });
-                        if (this.$wire.paid_amount) {
-                            this.$el.value = this.formatNum(this.$wire.paid_amount);
-                        }
-                    }
-                }"
-                x-on:input="let clean = $event.target.value.replace(/[^\d]/g, ''); if(clean) { let formatted = formatNum(parseInt(clean)); $event.target.value = formatted; $wire.$set('paid_amount', parseInt(clean)); } else { $event.target.value = ''; $wire.$set('paid_amount', 0); }"
-                x-on:blur="let clean = $event.target.value.replace(/[^\d]/g, ''); $wire.$set('paid_amount', clean ? parseInt(clean) : 0);"
-                x-on:keypress="if(!/[0-9]/.test($event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes($event.key)) $event.preventDefault();">
+                <div class="flex flex-wrap gap-3 mb-4" x-data="{ customMode: false }">
+                    @foreach ([1000, 500, 200, 100, 50, 20, 10, 5] as $bill)
+                        <button type="button"
+                            wire:click="$set('paid_amount', {{ $bill }})"
+                            x-on:click="customMode = false"
+                            class="w-28 h-20 rounded-xl text-base font-semibold border border-gray-200
+                                   bg-white text-gray-800 hover:bg-gray-50 shadow-sm
+                                   dark:bg-neutral-900 dark:text-gray-100 dark:border-neutral-700 dark:hover:bg-neutral-800">
+                            {{ $bill === 1000 ? '1k' : number_format($bill, 0, '.', ',') }}
+                        </button>
+                    @endforeach
+                    <button type="button"
+                        x-on:click="customMode = true; $wire.set('paid_amount', null); $nextTick(() => $refs.customPaid?.focus())"
+                        class="w-28 h-20 rounded-xl text-base font-semibold border border-gray-200
+                               bg-white text-gray-800 hover:bg-gray-50 shadow-sm
+                               dark:bg-neutral-900 dark:text-gray-100 dark:border-neutral-700 dark:hover:bg-neutral-800">
+                        Custom
+                    </button>
+                </div>
+                <div x-show="customMode" class="mb-4">
+                    <input type="number" min="0" step="1" placeholder="Enter amount"
+                        x-ref="customPaid"
+                        wire:model.live.debounce.300ms="paid_amount"
+                        class="py-2.5 sm:py-3 px-4 block w-full border-gray-200 rounded-lg sm:text-sm
+                               focus:border-blue-500 focus:ring-blue-500
+                               dark:bg-neutral-900 dark:border-neutral-700
+                               dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600">
+                </div>
             </div>
 
             <!-- REMOVED: Discount input section -->

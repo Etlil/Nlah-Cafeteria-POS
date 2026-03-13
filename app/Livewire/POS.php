@@ -23,6 +23,7 @@ class POS extends Component
     public $paymentMethods;
     public $search = '';
     public $cart = [];
+    public $category = 'all';
 
     //properties for checkout
     public $customer_id = null;
@@ -58,13 +59,15 @@ class POS extends Component
     #[Computed]
     public function filteredItems()
     {
-        if (empty($this->search)) {
-            return $this->items;
-        }
-
         return $this->items->filter(function ($item) {
-            return str_contains(strtolower($item->name), strtolower($this->search))
+            $matchesSearch = empty($this->search)
+                || str_contains(strtolower($item->name), strtolower($this->search))
                 || str_contains(strtolower($item->sku), strtolower($this->search));
+
+            $matchesCategory = $this->category === 'all'
+                || strtolower((string) $item->type) === $this->category;
+
+            return $matchesSearch && $matchesCategory;
         });
 
     }
